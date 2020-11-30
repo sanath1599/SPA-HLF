@@ -1,0 +1,63 @@
+############## Steps for creating and adding another peer to the network ################
+
+1. Set environment variables
+    export PATH=${PWD}/../bin:${PWD}:$PATH
+
+2. Generate the crypto material for the new peer for hdfc
+
+    export FABRIC_CA_CLIENT_HOME=${PWD}/organizations/peerOrganizations/hdfc.example.com/
+
+    fabric-ca-client register --caname ca-hdfc --id.name peer1 --id.secret peer1pw --id.type peer --tls.certfiles ${PWD}/organizations/fabric-ca/hdfc/tls-cert.pem
+
+    mkdir -p organizations/peerOrganizations/hdfc.example.com/peers/peer1.hdfc.example.com
+
+    fabric-ca-client enroll -u https://peer1:peer1pw@localhost:7054 --caname ca-hdfc -M ${PWD}/organizations/peerOrganizations/hdfc.example.com/peers/peer1.hdfc.example.com/msp --csr.hosts peer1.hdfc.example.com --tls.certfiles ${PWD}/organizations/fabric-ca/hdfc/tls-cert.pem
+
+    cp ${PWD}/organizations/peerOrganizations/hdfc.example.com/msp/config.yaml ${PWD}/organizations/peerOrganizations/hdfc.example.com/peers/peer1.hdfc.example.com/msp/config.yaml
+
+    fabric-ca-client enroll -u https://peer1:peer1pw@localhost:7054 --caname ca-hdfc -M ${PWD}/organizations/peerOrganizations/hdfc.example.com/peers/peer1.hdfc.example.com/tls --enrollment.profile tls --csr.hosts peer1.hdfc.example.com --csr.hosts localhost --tls.certfiles ${PWD}/organizations/fabric-ca/hdfc/tls-cert.pem
+
+    cp ${PWD}/organizations/peerOrganizations/hdfc.example.com/peers/peer1.hdfc.example.com/tls/tlscacerts/* ${PWD}/organizations/peerOrganizations/hdfc.example.com/peers/peer1.hdfc.example.com/tls/ca.crt
+
+    cp ${PWD}/organizations/peerOrganizations/hdfc.example.com/peers/peer1.hdfc.example.com/tls/signcerts/* ${PWD}/organizations/peerOrganizations/hdfc.example.com/peers/peer1.hdfc.example.com/tls/server.crt
+
+    cp ${PWD}/organizations/peerOrganizations/hdfc.example.com/peers/peer1.hdfc.example.com/tls/keystore/* ${PWD}/organizations/peerOrganizations/hdfc.example.com/peers/peer1.hdfc.example.com/tls/server.key
+
+3. Create the docker compose file and bring it up 
+
+    IMAGE_TAG=latest docker-compose -f ${PWD}/docker/docker-compose-peer1-hdfc.yaml up -d
+
+    docker ps
+
+4. Check the channels the other peer has joined
+    
+    env | grep CORE 
+
+    peer channel list
+
+    peer channel getinfo -c mychannel
+
+5. Check the channle list of the new peer
+
+    export CORE_PEER_LOCALMSPID=HDFCMSP
+    export CORE_PEER_ADDRESS=localhost:8051
+    export CORE_PEER_TLS_ENABLED=true
+    export CORE_PEER_MSPCONFIGPATH=${PWD}/organizations/peerOrganizations/hdfc.example.com/users/Admin@hdfc.example.com/msp
+    export CORE_PEER_TLS_ROOTCERT_FILE=${PWD}/organizations/peerOrganizations/hdfc.example.com/peers/peer1.hdfc.example.com/tls/ca.crt
+
+    peer channel list
+
+6. Join the channel
+
+    peer channel join -b channel-artifacts/mychannel.block
+
+    peer channel getinfo -c mychannel
+
+7. Query the World State 
+
+    peer chaincode query -C mychannel -n spa-pdc -c '{"Args":["GetAccountStatement","Calvin@HDFC"]}'
+
+    peer lifecycle chaincode install spa-pdc.tar.gz
+
+    docker ps
+

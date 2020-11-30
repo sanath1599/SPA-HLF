@@ -1,0 +1,80 @@
+Deep Dive
+Instructions: 
+1.	Make sure you watch over the logs to check what is happening with various docker instances when the commands are executed
+2.	Try and connect to the theory we discussed in the initial days
+3.	Always refer to the network.sh and the corresponding shell scripts to understand from the comments what is happening
+4.	To watch for logs in the console, make changes to attach the docker logs to console
+
+
+In the test network folder do the following:
+
+################################# Generate Certificates and System Channel ###############################################
+
+./network.sh up -s couchdb -ca
+
+############################################ Create Channel #####################################################
+
+./network.sh createChannel
+
+############################################ Deploy Chaincode #####################################################
+
+./network.sh deployCC -ccn spa-pdc -cccg ${PWD}/../spa-chaincode-pdc/collection-config.json
+
+############################################ Chaincode Interaction #####################################################
+35. Export necessary environment variables
+	export PATH=${PWD}/../bin:${PWD}:$PATH
+ 	export FABRIC_CFG_PATH=${PWD}/configtx
+ 	export CHANNEL_NAME=mychannel
+
+36. Set Endorsing Peers
+	source ./scripts/setPeerConnectionParam.sh 1 2
+
+36. Initialize the chaincode
+	source ./scripts/setChannelContext.sh 1
+	peer chaincode invoke -o localhost:7050 --ordererTLSHostnameOverride orderer.example.com --tls --cafile $ORDERER_CA -C mychannel -n spa-pdc $PEER_CONN_PARMS -c '{"function":"InitLedger","Args":[]}'
+
+37. Register the Users
+	export ASSET_PROPERTIES=$(echo -n "{\"name\":\"Calvin\",\"address\":\"World of comics,HDFC\",\"sex\":\"Naugthy Boy\"}" | base64 | tr -d \\n)
+
+	peer chaincode invoke -o localhost:7050 --ordererTLSHostnameOverride orderer.example.com --tls --cafile $ORDERER_CA -C mychannel -n spa-pdc $PEER_CONN_PARMS -c '{"function":"RegisterUserAccount","Args":["HDFC"]}' --transient "{\"asset_properties\":\"$ASSET_PROPERTIES\"}"
+
+	peer chaincode query -C mychannel -n spa-pdc -c '{"Args":["ReadUserDetails","Calvin@HDFC"]}'
+
+	peer chaincode query -C mychannel -n spa-pdc -c '{"Args":["ReadUserFromCollection","HDFCMSPUserCollection","Calvin@HDFC"]}'
+
+38. Approve User KYC Status
+	peer chaincode invoke -o localhost:7050 --ordererTLSHostnameOverride orderer.example.com --tls --cafile $ORDERER_CA -C mychannel -n spa-pdc $PEER_CONN_PARMS -c '{"function":"ApproveKYCStatus","Args":["Calvin@HDFC"]}'
+
+39. Query the Balance after initialize
+	peer chaincode query -C mychannel -n spa-pdc -c '{"Args":["Balance","Calvin@HDFC"]}'
+	
+40. Switch the context for Org2
+	source ./scripts/setChannelContext.sh 2
+
+41. Register the Users
+	export ASSET_PROPERTIES=$(echo -n "{\"name\":\"Hobbies\",\"address\":\"World of comics,SBI\",\"sex\":\"A cuddly tiger\"}" | base64 | tr -d \\n)
+	peer chaincode invoke -o localhost:7050 --ordererTLSHostnameOverride orderer.example.com --tls --cafile $ORDERER_CA -C mychannel -n spa-pdc $PEER_CONN_PARMS -c '{"function":"RegisterUserAccount","Args":["SBI"]}' --transient "{\"asset_properties\":\"$ASSET_PROPERTIES\"}"
+
+42.	Read User Private Details
+	peer chaincode query -C mychannel -n spa-pdc -c '{"Args":["ReadUserDetails","Hobbies@SBI"]}'
+
+43.	Read User Private Details With Collection (This will fail due to private Collection access)
+	peer chaincode query -C mychannel -n spa-pdc -c '{"Args":["ReadUserFromCollection","HDFCMSPUserCollection","Hobbies@SBI"]}'
+
+44. ApproveKYCStatus
+	peer chaincode invoke -o localhost:7050 --ordererTLSHostnameOverride orderer.example.com --tls --cafile $ORDERER_CA -C mychannel -n spa-pdc $PEER_CONN_PARMS -c '{"function":"ApproveKYCStatus","Args":["Hobbies@SBI"]}'
+
+45. Query the Balance after initialize
+	peer chaincode query -C mychannel -n spa-pdc -c '{"Args":["Balance","Hobbies@SBI"]}'
+
+46. Peer invoke the transfer function
+	peer chaincode invoke -o localhost:7050 --ordererTLSHostnameOverride orderer.example.com --tls --cafile $ORDERER_CA -C mychannel -n spa-pdc $PEER_CONN_PARMS -c '{"function":"Transfer","Args":["Hobbies@SBI","Calvin@HDFC", "50"]}'
+
+47. Get Account Statement
+	peer chaincode query -C mychannel -n spa-pdc -c '{"Args":["GetAccountStatement","Calvin@HDFC"]}'
+
+48. Get All User Balances
+	peer chaincode query -C mychannel -n spa-pdc -c '{"Args":["GetAllUserBalanceForOrg","HDFC"]}'
+
+49. Bring Down the Network, when you are done playing around
+	./network.sh down
